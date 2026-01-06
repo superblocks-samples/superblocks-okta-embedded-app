@@ -1,0 +1,12 @@
+# Node modules
+node_modules/
+
+# Built Assets
+build/
+function.zip
+
+# OS or Editor folders
+.env
+.DS_Store
+.vscode/
+.idea/
