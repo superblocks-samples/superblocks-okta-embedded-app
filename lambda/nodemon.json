@@ -1,0 +1,18 @@
+{
+  "watch": [
+    "index.js",
+    "dev-server.js",
+    ".env"
+  ],
+  "ext": "js,json,env",
+  "ignore": [
+    "node_modules/**",
+    "*.zip",
+    "*.log"
+  ],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 500
+}
+

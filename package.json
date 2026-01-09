@@ -4,12 +4,20 @@
   "description": "A repository for integrating Superblocks with custom authentication using Okta.",
   "scripts": {
     "install": "npm install --prefix ./app && npm install --prefix ./lambda",
-    "start": "npm run dev --prefix ./app",
-    "test:lambda": "npm test --prefix ./lambda",
+    "start": "concurrently \"npm run dev:lambda\" \"npm run dev:app\"",
+    "dev:app": "npm run dev --prefix ./app",
+    "dev:lambda": "npm run dev --prefix ./lambda",
     "build:app": "npm run build --prefix ./app",
     "build:lambda": "npm run build --prefix ./lambda",
     "build:all": "npm run build --prefix ./app && npm run build --prefix ./lambda"
   },
   "author": "Kris Harbold",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
 }
