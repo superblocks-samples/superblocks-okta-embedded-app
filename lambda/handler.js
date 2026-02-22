@@ -2,8 +2,6 @@ const axios = require("axios");
 const jwt = require('jsonwebtoken');
 const OktaJwtVerifier = require('@okta/jwt-verifier');
 
-require('dotenv').config();
-
 const SUPERBLOCKS_EMBED_ACCESS_TOKEN = process.env.SUPERBLOCKS_EMBED_ACCESS_TOKEN;
 const SUPERBLOCKS_URL = process.env.SUPERBLOCKS_URL;
 const OKTA_AUDIENCE = process.env.OKTA_AUDIENCE || 'api://default';
@@ -20,9 +18,7 @@ exports.handler = async (event) => {
     console.log(`[${timestamp}] [${requestId}] Token exchange started`);
 
     const authHeader = event.headers['authorization'] || event.headers['Authorization'];
-    const idToken = event.headers['x-id-token'] || event.headers['X-ID-Token'];
 
-    // Validate request has required headers
     if (!authHeader) {
         console.error(`[${timestamp}] [${requestId}] ERROR: Missing Authorization header`);
         return {
@@ -34,13 +30,24 @@ exports.handler = async (event) => {
         };
     }
 
-    if (!idToken) {
-        console.error(`[${timestamp}] [${requestId}] ERROR: Missing X-ID-Token header`);
+    let body;
+    try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+    } catch (e) {
         return {
-            statusCode: 401,
+            statusCode: 400,
+            body: JSON.stringify({ error: 'Bad Request', message: 'Invalid JSON body' })
+        };
+    }
+
+    const idToken = body.id_token;
+    if (!idToken) {
+        console.error(`[${timestamp}] [${requestId}] ERROR: Missing id_token in request body`);
+        return {
+            statusCode: 400,
             body: JSON.stringify({
-                error: 'Unauthenticated',
-                message: 'X-ID-Token header is required'
+                error: 'Bad Request',
+                message: 'id_token is required in the request body'
             })
         };
     }

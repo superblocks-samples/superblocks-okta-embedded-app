@@ -5,8 +5,16 @@ node_modules/
 build/
 function.zip
 
+# SAM
+.aws-sam/
+.sam-build/
+samconfig.toml
+
+# Environment files (real values)
+.env*
+env.local.json
+
 # OS or Editor folders
-.env
 .DS_Store
 .vscode/
 .idea/

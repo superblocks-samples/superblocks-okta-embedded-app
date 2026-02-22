@@ -6,10 +6,11 @@
     "install": "npm install --prefix ./app && npm install --prefix ./lambda",
     "start": "concurrently \"npm run dev:lambda\" \"npm run dev:app\"",
     "dev:app": "npm run dev --prefix ./app",
-    "dev:lambda": "npm run dev --prefix ./lambda",
+    "dev:lambda": "npm run sam:local --prefix ./lambda",
     "build:app": "npm run build --prefix ./app",
-    "build:lambda": "npm run build --prefix ./lambda",
-    "build:all": "npm run build --prefix ./app && npm run build --prefix ./lambda"
+    "build:lambda": "npm run sam:build --prefix ./lambda",
+    "build": "concurrently \"npm run build:app\" \"npm run build:lambda\"",
+    "invoke:lambda": "npm run sam:invoke --prefix ./lambda"
   },
   "author": "Kris Harbold",
   "license": "MIT",
