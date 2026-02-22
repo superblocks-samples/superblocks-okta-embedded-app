@@ -101,7 +101,19 @@ Opens http://localhost:3000 (React) and http://localhost:3001 (Lambda via SAM lo
 
 ## 🚢 Production Deployment
 
-### 1. Deploy Lambda Function
+### 1. Create Secrets Manager Secret
+
+Store your Superblocks embed access token in AWS Secrets Manager:
+
+```bash
+aws secretsmanager create-secret \
+    --name superblocks/embed-access-token \
+    --secret-string "your-superblocks-embed-access-token"
+```
+
+Note the ARN from the output — you'll need it during deployment.
+
+### 2. Deploy Lambda Function
 
 Deploy with SAM ([detailed guide](docs/deploy-lambda.md)):
 
@@ -111,9 +123,9 @@ sam build
 sam deploy --guided
 ```
 
-SAM will prompt you for parameter values and create the API Gateway automatically. After deploying, set `SUPERBLOCKS_EMBED_ACCESS_TOKEN` in the Lambda console environment variables.
+SAM will prompt you for parameter values including `SuperblocksTokenSecretArn` (the ARN from step 1) and create the API Gateway automatically.
 
-### 2. Deploy React App
+### 3. Deploy React App
 
 Build the app:
 
@@ -135,7 +147,7 @@ REACT_APP_USE_LOCAL_LAMBDA=false
 REACT_APP_API_GATEWAY_URL=https://your-api-gateway-url.com/prod/auth
 ```
 
-### 3. Update Okta Configuration
+### 4. Update Okta Configuration
 
 Add your production URL to Okta redirect URIs:
 
