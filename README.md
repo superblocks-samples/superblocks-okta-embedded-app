@@ -26,6 +26,8 @@ This example demonstrates how to build a custom authentication flow for embedded
 ## Prerequisites
 
 - **Node.js** 20+ and **npm** 10+
+- **Docker Desktop** (required for SAM local development)
+- **[AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)**
 - **Okta Account** with admin access
 - **Superblocks Account** with embed enabled
 - **AWS Account** (for production deployment only)
@@ -51,18 +53,24 @@ Create an Okta OIDC Single-Page Application ([detailed guide](docs/setup-okta-ap
 
 ### 3. Configure Environment
 
-**Lambda** (`lambda/.env`):
+**Lambda** (`lambda/env.local.json`):
 
 ```bash
-cp lambda/env.example lambda/.env
+cp lambda/env.local.json.example lambda/env.local.json
 ```
 
 Edit with your values:
 
-```env
-SUPERBLOCKS_EMBED_ACCESS_TOKEN=sb_embed_your-token
-OKTA_ISSUER=https://your-domain.okta.com/oauth2/default
-SUPERBLOCKS_URL=https://your-instance.superblocks.com
+```json
+{
+  "TokenExchangeFunction": {
+    "SUPERBLOCKS_EMBED_ACCESS_TOKEN": "sb_embed_your-token",
+    "OKTA_ISSUER": "https://your-domain.okta.com/oauth2/default",
+    "OKTA_AUDIENCE": "api://default",
+    "SUPERBLOCKS_URL": "https://your-instance.superblocks.com",
+    "DEBUG": "true"
+  }
+}
 ```
 
 **React App** (`app/.env.local`):
@@ -81,7 +89,7 @@ REACT_APP_SUPERBLOCKS_URL=https://your-instance.superblocks.com
 REACT_APP_USE_LOCAL_LAMBDA=true
 ```
 
-> ⚠️ `OKTA_ISSUER` must match in both files
+> ⚠️ `OKTA_ISSUER` must match in both files. SAM local development requires Docker Desktop.
 
 ### 4. Start Development
 
@@ -89,30 +97,35 @@ REACT_APP_USE_LOCAL_LAMBDA=true
 npm start
 ```
 
-Opens http://localhost:3000 (React) and http://localhost:3001 (Lambda). Both have hot reloading enabled.
+Opens http://localhost:3000 (React) and http://localhost:3001 (Lambda via SAM local).
 
 ## 🚢 Production Deployment
 
-### 1. Deploy Lambda Function
+### 1. Create Secrets Manager Secret
 
-Build and deploy ([detailed guide](docs/deploy-lambda.md)):
+Store your Superblocks embed access token in AWS Secrets Manager:
 
 ```bash
-npm run build:lambda
-# Creates lambda/function.zip
+aws secretsmanager create-secret \
+    --name superblocks/embed-access-token \
+    --secret-string "your-superblocks-embed-access-token"
 ```
 
-1. Upload `function.zip` to AWS Lambda
-2. Set environment variables in Lambda console:
-   - `SUPERBLOCKS_EMBED_ACCESS_TOKEN`
-   - `OKTA_ISSUER`
-   - `SUPERBLOCKS_URL`
-   - `OKTA_AUDIENCE` (optional, defaults to `api://default`)
-3. Create API Gateway endpoint
-4. Enable CORS for your domain
-5. Save the API Gateway URL
+Note the ARN from the output — you'll need it during deployment.
 
-### 2. Deploy React App
+### 2. Deploy Lambda Function
+
+Deploy with SAM ([detailed guide](docs/deploy-lambda.md)):
+
+```bash
+cd lambda
+sam build
+sam deploy --guided
+```
+
+SAM will prompt you for parameter values including `SuperblocksTokenSecretArn` (the ARN from step 1) and create the API Gateway automatically.
+
+### 3. Deploy React App
 
 Build the app:
 
@@ -134,7 +147,7 @@ REACT_APP_USE_LOCAL_LAMBDA=false
 REACT_APP_API_GATEWAY_URL=https://your-api-gateway-url.com/prod/auth
 ```
 
-### 3. Update Okta Configuration
+### 4. Update Okta Configuration
 
 Add your production URL to Okta redirect URIs:
 
@@ -157,7 +170,7 @@ Add your production URL to Okta redirect URIs:
 | `REACT_APP_USE_LOCAL_LAMBDA`           | ❌       | Use local Lambda server                          | `false` |
 | `REACT_APP_API_GATEWAY_URL`            | ✅\*     | API Gateway URL (\*required if not local)        | -       |
 
-**Lambda** (`lambda/.env`):
+**Lambda** (`lambda/env.local.json`):
 
 | Variable                         | Required | Description                             | Default         |
 | -------------------------------- | -------- | --------------------------------------- | --------------- |
@@ -171,26 +184,22 @@ Add your production URL to Okta redirect URIs:
 
 **Root Directory:**
 
-| Script               | Description                       |
-| -------------------- | --------------------------------- |
-| `npm start`          | Start full stack (Lambda + React) |
-| `npm run dev:app`    | Start React app only              |
-| `npm run dev:lambda` | Start Lambda server only          |
-| `npm run build:all`  | Build both for production         |
-
-**React App** (`app/`):
-
-| Script          | Description                               |
-| --------------- | ----------------------------------------- |
-| `npm run dev`   | Development mode with git branch tracking |
-| `npm run build` | Build app for deployment                  |
+| Script                  | Description                           |
+| ----------------------- | ------------------------------------- |
+| `npm start`             | Start full stack (SAM Lambda + React) |
+| `npm run dev:app`       | Start React app only                  |
+| `npm run dev:lambda`    | Start SAM local API (port 3001)       |
+| `npm run build:app`     | Build React app for deployment        |
+| `npm run build:lambda`  | Build the Lambda SAM application      |
+| `npm run invoke:lambda` | Invoke Lambda locally with test event |
 
 **Lambda** (`lambda/`):
 
-| Script          | Description                          |
-| --------------- | ------------------------------------ |
-| `npm run dev`   | Start local dev server (port 3001)   |
-| `npm run build` | Create `function.zip` for AWS Lambda |
+| Script              | Description                              |
+| ------------------- | ---------------------------------------- |
+| `npm run sam:build` | Build the SAM application                |
+| `npm run sam:local` | Start SAM local API (port 3001)          |
+| `npm run sam:invoke`| Invoke function locally with test event  |
 
 ## 🐛 Troubleshooting
 
@@ -220,7 +229,7 @@ Add your production URL to Okta redirect URIs:
 
 **Fix:**
 
-- Ensure `OKTA_ISSUER` in `lambda/.env` matches `REACT_APP_OKTA_ISSUER` in `app/.env.local`
+- Ensure `OKTA_ISSUER` in `lambda/env.local.json` matches `REACT_APP_OKTA_ISSUER` in `app/.env.local`
 - Check for trailing slashes or typos
 
 ### CORS Errors
@@ -230,7 +239,7 @@ Add your production URL to Okta redirect URIs:
 **Fix:**
 
 - Enable CORS in API Gateway
-- Allow `Authorization` and `X-ID-Token` headers
+- Allow `Authorization` and `Content-Type` headers
 - Add your app origin to allowed origins
 
 ## 📚 Additional Resources

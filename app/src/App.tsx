@@ -25,7 +25,7 @@ const App = () => {
   const superblocksUrl = process.env.REACT_APP_SUPERBLOCKS_URL;
   const superblocksAppVersion = process.env.REACT_APP_SUPERBLOCKS_APP_VERSION || '2.0';
   const tokenUrl = process.env.REACT_APP_USE_LOCAL_LAMBDA === 'true'
-    ? 'http://localhost:3001/auth'
+    ? 'http://localhost:3001/oauth2/token'
     : process.env.REACT_APP_API_GATEWAY_URL;
 
   // Build Superblocks embed URL based on version
@@ -82,12 +82,14 @@ const App = () => {
       console.log('Fetching Superblocks token from:', tokenUrl);
 
       const res = await fetch(tokenUrl, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken.accessToken}`,
           'Content-Type': 'application/json',
-          'X-ID-Token': idToken.idToken
-        }
+        },
+        body: JSON.stringify({
+          id_token: idToken.idToken,
+        }),
       });
 
       if (!res.ok) {

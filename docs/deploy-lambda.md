@@ -1,96 +1,87 @@
-# Deploying Lambda Auth Function
+# Deploying the Lambda Function
+
+For local development setup, see the [README](../README.md#-quick-start--local-development).
 
 ## Prerequisites
 
-Before deploying your Lambda function, ensure that you have the following:
-
 - An AWS account with appropriate permissions
+- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) installed
 - AWS CLI installed and configured with `aws configure`
-- An IAM role with the necessary permissions for Lambda and API Gateway
 
-## Deploying the Lambda Function
+## 1. Create the Secrets Manager Secret
 
-1. **Install Lambda Dependencies**
+Store your Superblocks embed access token in AWS Secrets Manager:
 
-   Ensure that all dependencies are installed for the lambda function by running:
+```bash
+aws secretsmanager create-secret \
+    --name superblocks/embed-access-token \
+    --secret-string "your-superblocks-embed-access-token"
+```
 
-   ```bash
-   npm install
-   ```
+Note the ARN from the output — you'll need it during deployment.
 
-2. **Package the Lambda Function**
+## 2. Build
 
-   Prepare the Lambda function for deployment by creating a zip file containing your function code and dependencies. Run:
+```bash
+cd lambda
+sam build
+```
 
-   ```bash
-   npm run build:lambda
-   ```
+## 3. Deploy (First Time)
 
-3. **Deploy the Lambda Function**
+```bash
+sam deploy --guided
+```
 
-   Use the AWS CLI to create a new Lambda function. Replace `<YOUR_FUNCTION_NAME>` and `<YOUR_ROLE_ARN>` with your respective values.
+SAM will prompt you for the following parameters:
 
-   ```bash
-   aws lambda create-function \
-       --function-name <YOUR_FUNCTION_NAME> \
-       --zip-file fileb://lambda/function.zip \
-       --handler index.handler \
-       --runtime nodejs20.x \
-       --role <YOUR_ROLE_ARN>
-   ```
+| Parameter                  | Description                                        | Example                                                |
+| -------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| `OktaIssuer`               | Okta Authorization Server Issuer URL               | `https://dev-12345.okta.com/oauth2/default`            |
+| `OktaAudience`             | Expected audience claim (defaults to `api://default`) | `api://default`                                     |
+| `SuperblocksUrl`           | Superblocks instance URL                           | `https://app.superblocks.com`                          |
+| `SuperblocksTokenSecretArn`| ARN of the Secrets Manager secret from step 1      | `arn:aws:secretsmanager:us-west-2:123456:secret:...`   |
 
-4. **Set Up Environment Variables and Secrets**
+Your choices are saved to `samconfig.toml` for future deploys.
 
-   Configure the following environment variables using the following command:
+## 4. Deploy (Subsequent)
 
-   ```bash
-   aws lambda update-function-configuration \
-       --function-name <YOUR_FUNCTION_NAME> \
-       --environment "Variables={SUPERBLOCKS_URL='https://app.superblocks.com',SUPERBLOCKS_EMBED_ACCESS_TOKEN='your_superblocks_token',OKTA_ISSUER='your_okta_issuer'}"
-   ```
+```bash
+sam deploy
+```
 
-   Replace with the following values:
+## 5. Verify
 
-   - `SUPERBLOCKS_URL`: (Optional) Base URL of your Superblocks instance in the format `https://<your-instance>.superblocks.com`. Defaults to `https://app.superblocks.com` if not set. Use this if you have a custom domain or on-premise installation.
-   - `SUPERBLOCKS_EMBED_ACCESS_TOKEN`: [Embed access token](https://docs.superblocks.com/administration/security/access-tokens#api-authentication) to use with the session API
-   - `OKTA_ISSUER`: Okta issuer URL associated with your [Okta OIDC app](./setup-okta-app.md) (e.g., `https://dev-12345.okta.com/oauth2/default`)
+After deployment, SAM outputs the `AuthEndpoint` URL. Test it with curl:
 
-## Setting Up API Gateway
+```bash
+curl -X POST "https://<api-id>.execute-api.<region>.amazonaws.com/oauth2/token" \
+    -H "Authorization: Bearer $OKTA_ACCESS_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"id_token": "'$OKTA_ID_TOKEN'"}'
+```
 
-Expose the Lambda function through an API Gateway, follow these steps:
+## Updating the Secret
 
-1. **Create a New API**
+To rotate the Superblocks embed access token:
 
-   - Go to the [API Gateway console](https://console.aws.amazon.com/apigateway)
-   - Click on **Create API** and select **HTTP API**
-   - Click on **Build**
+```bash
+aws secretsmanager put-secret-value \
+    --secret-id superblocks/embed-access-token \
+    --secret-string "new-superblocks-embed-access-token"
+```
 
-2. **Configure the API**
+The Lambda will pick up the new value on the next cold start (or you can redeploy to force it).
 
-   - Under the **Configure routes** section, set the **Route** to `/oauth/token`
-   - Select **Add Integration** and choose **Lambda**
-   - Choose the Lambda function you deployed in the previous section
+## Tearing Down
 
-3. **Set the Integration Type**
+```bash
+cd lambda
+sam delete
+```
 
-   - Set the integration type to be **Lambda Function**
-   - Choose the region where your Lambda function is deployed and select your Lambda function from the dropdown
+This removes the Lambda function, API Gateway, and IAM role. The Secrets Manager secret is **not** deleted — remove it separately if needed:
 
-4. **Enable CORS**
-
-   To let the React app make requests to the Lambda function via the API Gateway, you need to enable CORS:
-
-   - In the API Gateway console, select your API
-   - Go to the **CORS** settings
-   - Under **CORS Configuration**, you can specify the allowed origins. For example, to allow requests from the React app running on `http://localhost:3000`, you should add that URL
-   - You can also configure allowed HTTP methods (`GET`) and headers (`Authorization`, `X-ID-Token`, `Content-Type`) that the React app sends with the requests
-
-5. **Deploy the API**
-
-   - Click on **Next** until you reach the **Deployments** section
-   - Click on **Create** to deploy your API
-   - Once the API is created, note the **Invoke URL** displayed. This URL will be used to access your Lambda function
-
-6. **Test the API**
-
-   You can now test the API by sending a request to `https://<your-api-id>.execute-api.<region>.amazonaws.com/oauth/token`. You can use tools like Postman or curl to send requests
+```bash
+aws secretsmanager delete-secret --secret-id superblocks/embed-access-token
+```
