@@ -94,8 +94,7 @@ REACT_APP_USE_LOCAL_LAMBDA=true
 ### 4. Start Development
 
 ```bash
-npm run build:lambda   # Build the Lambda SAM application (first time / after changes)
-npm start              # Start React app + SAM local API concurrently
+npm start
 ```
 
 Opens http://localhost:3000 (React) and http://localhost:3001 (Lambda via SAM local).
@@ -199,7 +198,7 @@ Add your production URL to Okta redirect URIs:
 **Fix:**
 
 - Verify `REACT_APP_USE_LOCAL_LAMBDA=true` in `app/.env.local`
-- Ensure Lambda server is running: `npm run build:lambda && npm run dev:lambda`
+- Ensure Lambda server is running: `npm run dev:lambda`
 - Restart React app after changing environment variables: `npm run dev:app`
 
 ### Okta "Policy evaluation failed"
@@ -228,7 +227,7 @@ Add your production URL to Okta redirect URIs:
 **Fix:**
 
 - Enable CORS in API Gateway
-- Allow `Authorization` and `X-ID-Token` headers
+- Allow `Authorization` and `Content-Type` headers
 - Add your app origin to allowed origins
 
 ## 📚 Additional Resources

@@ -20,6 +20,9 @@ Parameters:
     Type: String
     Description: Superblocks instance URL
     Default: "https://app.superblocks.com"
+  SuperblocksTokenSecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret containing the Superblocks embed access token
 
 Resources:
   HttpApi:
@@ -45,7 +48,13 @@ Resources:
           OKTA_ISSUER: !Ref OktaIssuer
           OKTA_AUDIENCE: !Ref OktaAudience
           SUPERBLOCKS_URL: !Ref SuperblocksUrl
-          SUPERBLOCKS_EMBED_ACCESS_TOKEN: "CHANGE_ME"
+          SUPERBLOCKS_TOKEN_SECRET_ARN: !Ref SuperblocksTokenSecretArn
+          SUPERBLOCKS_EMBED_ACCESS_TOKEN: ""
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref SuperblocksTokenSecretArn
       Events:
         Exchange:
           Type: HttpApi

@@ -1,11 +1,34 @@
 const axios = require("axios");
 const jwt = require('jsonwebtoken');
 const OktaJwtVerifier = require('@okta/jwt-verifier');
+const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 
-const SUPERBLOCKS_EMBED_ACCESS_TOKEN = process.env.SUPERBLOCKS_EMBED_ACCESS_TOKEN;
 const SUPERBLOCKS_URL = process.env.SUPERBLOCKS_URL;
 const OKTA_AUDIENCE = process.env.OKTA_AUDIENCE || 'api://default';
 const DEBUG = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development';
+
+let cachedEmbedToken = null;
+
+async function getEmbedAccessToken() {
+    if (cachedEmbedToken) return cachedEmbedToken;
+
+    // Local dev: use env var directly from env.local.json
+    if (process.env.SUPERBLOCKS_EMBED_ACCESS_TOKEN) {
+        cachedEmbedToken = process.env.SUPERBLOCKS_EMBED_ACCESS_TOKEN;
+        return cachedEmbedToken;
+    }
+
+    // Production: fetch from Secrets Manager (SDK available in Lambda runtime)
+    const secretArn = process.env.SUPERBLOCKS_TOKEN_SECRET_ARN;
+    if (!secretArn) {
+        throw new Error('No SUPERBLOCKS_EMBED_ACCESS_TOKEN or SUPERBLOCKS_TOKEN_SECRET_ARN configured');
+    }
+
+    const client = new SecretsManagerClient();
+    const resp = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
+    cachedEmbedToken = resp.SecretString;
+    return cachedEmbedToken;
+}
 
 const oktaJwtVerifier = new OktaJwtVerifier({
     issuer: process.env.OKTA_ISSUER,
@@ -88,6 +111,8 @@ exports.handler = async (event) => {
         // Step 4: Exchange for Superblocks token
         console.log(`[${timestamp}] [${requestId}] Exchanging token with Superblocks`);
 
+        const embedAccessToken = await getEmbedAccessToken();
+
         if (DEBUG) {
             console.log(`[${timestamp}] [${requestId}] DEBUG: Superblocks URL: ${SUPERBLOCKS_URL}`);
             console.log(`[${timestamp}] [${requestId}] DEBUG: Request payload:`, JSON.stringify(user, null, 2));
@@ -99,7 +124,7 @@ exports.handler = async (event) => {
             user,
             {
                 headers: {
-                    'Authorization': `Bearer ${SUPERBLOCKS_EMBED_ACCESS_TOKEN}`,
+                    'Authorization': `Bearer ${embedAccessToken}`,
                     'Content-Type': 'application/json'
                 },
             }
